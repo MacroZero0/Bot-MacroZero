@@ -1,0 +1,18 @@
+# --- Segurança (CRÍTICO) ---
+.env
+
+# --- Lixo do Python ---
+__pycache__/
+*.py[cod]
+
+# --- Ambiente Virtual (Pesado, não suba isso) ---
+venv/
+.venv/
+env/
+
+# --- Banco de Dados (Não suba seus dados reais) ---
+*.db
+*.sqlite3
+
+# --- Logs ---
+*.log
