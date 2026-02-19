@@ -5,9 +5,9 @@ import database
 # =============================================
 # CONFIGURAÇÕES — EDITE APENAS AQUI
 # =============================================
-ID_CANAL_PAINEL     = 1473020833600639077  # <-- Canal onde o painel de ponto fica fixo
-ID_CANAL_LOGS_PONTO = 1474111883530473753  # <-- Canal onde os logs de entrada/saída aparecem
-ID_CANAL_LOGS_CHEFIA = 1473020868752834713 # <-- Canal da chefia (solicitações de folga)
+ID_CANAL_PAINEL      = 1473020833600639077
+ID_CANAL_LOGS_PONTO  = 1474111883530473753
+ID_CANAL_LOGS_CHEFIA = 1473020868752834713
 CARGOS_CHEFIA = ["Supervisor", "Gerente", "Diretor"]
 # =============================================
 
@@ -43,14 +43,12 @@ class PainelPrincipal(discord.ui.View):
 
     @discord.ui.button(label="Abrir Ponto", style=discord.ButtonStyle.success, emoji="⏰", custom_id="btn_abrir")
     async def abrir_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 1. Checa DB
         if database.buscar_ponto_aberto(interaction.user.id):
             await interaction.response.send_message("❌ Você já está em serviço.", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
 
-        # 2. Envia log no canal de logs de ponto (canal separado)
         canal_logs_ponto = interaction.guild.get_channel(ID_CANAL_LOGS_PONTO)
         if not canal_logs_ponto:
             await interaction.followup.send("❌ Erro: Canal de logs de ponto não encontrado.", ephemeral=True)
@@ -64,30 +62,22 @@ class PainelPrincipal(discord.ui.View):
         embed_log.set_footer(text=f"ID: {interaction.user.id}")
         msg = await canal_logs_ponto.send(embed=embed_log)
 
-        # 3. Salva no DB com o ID da mensagem no canal de logs
         database.abrir_ponto_db(interaction.user.id, interaction.user.name, msg.id)
-
         await interaction.followup.send("✅ Ponto aberto com sucesso!", ephemeral=True)
-
-        # 4. Move o painel para baixo
         await self.reposicionar_painel(interaction.channel)
 
     @discord.ui.button(label="Fechar Ponto", style=discord.ButtonStyle.danger, emoji="🛑", custom_id="btn_fechar")
     async def fechar_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # 1. Checa DB
         ponto = database.buscar_ponto_aberto(interaction.user.id)
         if not ponto:
             await interaction.response.send_message("❌ Nenhum turno aberto.", ephemeral=True)
             return
 
         ponto_id, entrada_str, msg_id = ponto
-
         await interaction.response.defer(ephemeral=True)
 
-        # 2. Atualiza DB
         saida = database.fechar_ponto_db(ponto_id)
 
-        # 3. Calcula duração
         fmt = "%Y-%m-%d %H:%M:%S"
         d1 = datetime.strptime(entrada_str, fmt)
         d2 = datetime.strptime(saida, fmt)
@@ -96,7 +86,6 @@ class PainelPrincipal(discord.ui.View):
         minutos, segundos = divmod(resto, 60)
         duracao_fmt = f"{horas:02d}h {minutos:02d}m {segundos:02d}s"
 
-        # 4. Edita a mensagem original no canal de logs de ponto
         canal_logs_ponto = interaction.guild.get_channel(ID_CANAL_LOGS_PONTO)
         if canal_logs_ponto:
             try:
@@ -117,51 +106,48 @@ class PainelPrincipal(discord.ui.View):
             await interaction.followup.send("❌ Erro: Canal de logs de ponto não encontrado.", ephemeral=True)
 
         await interaction.followup.send(f"✅ Ponto fechado! Duração: **{duracao_fmt}**", ephemeral=True)
-
-        # 5. Move o painel para baixo
         await self.reposicionar_painel(interaction.channel)
 
     @discord.ui.button(label="Solicitar Folga", style=discord.ButtonStyle.primary, emoji="📅", custom_id="btn_folga")
     async def folga_callback(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.send_modal(FolgaModal())
-
-
-# --- MODAL DE FOLGA ---
-class FolgaModal(discord.ui.Modal, title="Solicitação de Dispensa"):
-    motivo = discord.ui.TextInput(
-        label="Motivo",
-        style=discord.TextStyle.short,
-        placeholder="Ex: Consulta médica, compromisso pessoal..."
-    )
-
-    async def on_submit(self, interaction: discord.Interaction):
         if database.verificar_folga_pendente(interaction.user.id):
-            await interaction.response.send_message("⚠️ Você já tem um pedido pendente.", ephemeral=True)
+            await interaction.response.send_message("⚠️ Você já tem um pedido de folga pendente.", ephemeral=True)
             return
 
-        folga_id, agora = database.criar_folga_db(interaction.user.id, interaction.user.name, self.motivo.value)
+        folga_id, agora = database.criar_folga_db(
+            interaction.user.id,
+            interaction.user.name,
+            "Sem motivo informado"
+        )
 
         canal_logs = interaction.guild.get_channel(ID_CANAL_LOGS_CHEFIA)
-        if canal_logs:
-            embed = discord.Embed(
-                title=f"📋 Solicitação de Folga #{folga_id}",
-                description=f"**Motivo:** {self.motivo.value}",
-                color=0xffff00
-            )
-            embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
-            embed.add_field(name="Data", value=f"`{agora}`")
-            embed.set_footer(text=f"ID do solicitante: {interaction.user.id}")
-            await canal_logs.send(embed=embed, view=PainelAdmin(folga_id))
-            await interaction.response.send_message("✅ Solicitação enviada à Supervisão!", ephemeral=True)
-        else:
+        if not canal_logs:
             await interaction.response.send_message("❌ Erro: Canal da chefia não configurado.", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=f"📋 Solicitação de Folga #{folga_id}",
+            color=0xFFC300  # Amarelo forte
+        )
+        embed.set_author(name=interaction.user.display_name, icon_url=interaction.user.display_avatar.url)
+        embed.add_field(name="Solicitante", value=f"{interaction.user.mention}", inline=True)
+        embed.add_field(name="Data", value=f"`{agora}`", inline=True)
+        embed.add_field(name="Status", value="🟡 Aguardando decisão...", inline=False)
+        embed.set_footer(text=f"User ID: {interaction.user.id} | Folga ID: {folga_id}")
+
+        await canal_logs.send(embed=embed, view=PainelAdmin(folga_id, interaction.user.id))
+
+        # Responde ephemeral e reposiciona o painel para baixo
+        await interaction.response.send_message("✅ Solicitação de folga enviada à Supervisão!", ephemeral=True)
+        await self.reposicionar_painel(interaction.channel)
 
 
 # --- BOTÕES DE ADMIN ---
 class PainelAdmin(discord.ui.View):
-    def __init__(self, folga_id):
+    def __init__(self, folga_id, solicitante_id):
         super().__init__(timeout=None)
         self.folga_id = folga_id
+        self.solicitante_id = solicitante_id
 
     async def check_perm(self, interaction):
         roles = [r.name for r in interaction.user.roles]
@@ -170,24 +156,64 @@ class PainelAdmin(discord.ui.View):
         await interaction.response.send_message("❌ Sem permissão.", ephemeral=True)
         return False
 
+    async def notificar_solicitante(self, interaction: discord.Interaction, aprovado: bool):
+        """Envia DM ao solicitante informando a decisão."""
+        try:
+            solicitante = await interaction.guild.fetch_member(self.solicitante_id)
+            if aprovado:
+                dm_embed = discord.Embed(
+                    title="✅ Folga Liberada",
+                    description=(
+                        f"Sua solicitação de folga **#{self.folga_id}** foi **aprovada**.\n\n"
+                        f"👤 **Aprovado(a) por:** {interaction.user.display_name}"
+                    ),
+                    color=0x00ff7f
+                )
+            else:
+                dm_embed = discord.Embed(
+                    title="🚫 Folga Negada",
+                    description=(
+                        f"Sua solicitação de folga **#{self.folga_id}** foi **negada**.\n\n"
+                        f"👤 **Negado(a) por:** {interaction.user.display_name}"
+                    ),
+                    color=0xff0000
+                )
+            dm_embed.set_footer(text="Sistema de Ponto • Mac")
+            await solicitante.send(embed=dm_embed)
+        except discord.Forbidden:
+            # Usuário com DMs fechadas — ignora silenciosamente
+            pass
+        except discord.NotFound:
+            pass
+
     @discord.ui.button(label="Aprovar", style=discord.ButtonStyle.success, custom_id="adm_aprov")
     async def aprovar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_perm(interaction):
             return
+
         database.atualizar_status_folga(self.folga_id, "APROVADO", interaction.user.name)
+
         embed = interaction.message.embeds[0]
-        embed.color = 0x00ff00
-        embed.add_field(name="Decisão", value=f"✅ **APROVADO** por {interaction.user.name}")
+        embed.color = 0x00ff7f
+        embed.set_field_at(2, name="Status", value="✅ **APROVADO**", inline=False)
+        embed.add_field(name="Decisão", value=f"Aprovado por **{interaction.user.display_name}**", inline=False)
+
         self.stop()
         await interaction.response.edit_message(embed=embed, view=None)
+        await self.notificar_solicitante(interaction, aprovado=True)
 
     @discord.ui.button(label="Negar", style=discord.ButtonStyle.danger, custom_id="adm_neg")
     async def negar(self, interaction: discord.Interaction, button: discord.ui.Button):
         if not await self.check_perm(interaction):
             return
+
         database.atualizar_status_folga(self.folga_id, "NEGADO", interaction.user.name)
+
         embed = interaction.message.embeds[0]
         embed.color = 0xff0000
-        embed.add_field(name="Decisão", value=f"🚫 **NEGADO** por {interaction.user.name}")
+        embed.set_field_at(2, name="Status", value="🚫 **NEGADO**", inline=False)
+        embed.add_field(name="Decisão", value=f"Negado por **{interaction.user.display_name}**", inline=False)
+
         self.stop()
         await interaction.response.edit_message(embed=embed, view=None)
+        await self.notificar_solicitante(interaction, aprovado=False)
