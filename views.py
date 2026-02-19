@@ -178,7 +178,7 @@ class PainelAdmin(discord.ui.View):
                     ),
                     color=0xff0000
                 )
-            dm_embed.set_footer(text="Sistema de Ponto • Mac")
+            dm_embed.set_footer(text="Sistema de Ponto • MacroZero")
             await solicitante.send(embed=dm_embed)
         except discord.Forbidden:
             # Usuário com DMs fechadas — ignora silenciosamente
