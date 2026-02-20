@@ -1,11 +1,11 @@
-# 📟 Sistema Tático de Controle de Ponto e Efetivo (Discord Bot)
+# 📟 Sistema de Controle de Ponto e Efetivo (Discord Bot)
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)
 ![Discord.py](https://img.shields.io/badge/discord.py-v2.3+-blue.svg)
 ![SQLite](https://img.shields.io/badge/SQLite-Database-lightgrey.svg)
 
 ## 📌 Sobre o Projeto
-Um bot de Discord desenvolvido em Python projetado para simular e automatizar o controle de ponto, logística de turnos e gestão de folgas de uma guarnição/equipe. Operando através de uma interface interativa (UI Views/Botões), o sistema elimina a necessidade de comandos manuais, persistindo todas as operações em um banco de dados relacional.
+Um bot de Discord desenvolvido em Python projetado para simular e automatizar o controle de ponto, logística de turnos e gestão de folgas de uma equipe. Operando através de uma interface interativa (UI Views/Botões), o sistema elimina a necessidade de comandos manuais, persistindo todas as operações em um banco de dados relacional.
 
 **Desenvolvido por:** MacroZero
 
